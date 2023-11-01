@@ -45,6 +45,7 @@ func GetRootCmd(cfg *core.Config) *cobra.Command {
 
 // Run runs the migration application.
 func Run(ctx context.Context, c *core.Config, output io.Writer) error {
+	// TODO make a logger that doesn't dump stack traces
 	logbase, err := zap.NewDevelopment()
 	if err != nil {
 		return fmt.Errorf("failed to initialize logger: %w", err)
