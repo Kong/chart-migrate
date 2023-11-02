@@ -12,8 +12,8 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// TODO a proper type would be nice, but I don't think we can create a perfect one.
-// aside from annoyances where some keys are commented by default,
+// TODO a proper type would be nice, but I don't think we can create a perfect
+// one. aside from annoyances where some keys are commented by default,
 // values.yaml is not a regular struct. Some sections like .env allow for
 // arbitrary keys. We can presumably map[string]interface{} these, however.
 // Unsure if there's a benefit to a struct beyond just map[string]interface{}
@@ -21,7 +21,21 @@ import (
 // since invalid values wouldn't have rendered in Helm.
 //
 // the gjson/sjson approach below may well be better for a limited set of keys,
-// since most everything we want to just leave in place, and it does that
+// since most everything we want to just leave in place, and it does that. structs
+// would probably be more difficult to maintain over time--the pure JSON approach
+// doesn't require a rigid schema, just a basic "expect key here" paths. we can
+// bundle sets of paths into migrations releases similar to Kong's to provide a
+// path between versions, e.g. you could run a "foo.red -> foo.blue" and then
+// "foo.blue -> bar.blue" after. As long as they run in order, they should reach
+// the final state without returning full structs for each version.
+
+// TODO some limitations of this approach:
+// - comments go poof because of the YAML->JSON->YAML conversion. Don't think we can save those without a pure YAML
+//   workflow. Hopefully matters less for user values.yamls, but I expect at least some have their own comments that
+//   would have to be re-added manually.
+// - existing and new keys are simply alphabetized at some point. preserving those would presumably require keeping
+//   track of indices for each and finding some manipulation tool that does preserve them. structs probably do this
+//   but we're not operating on structs.
 
 type Config struct {
 	// SourceChart indicates whether the values.yaml to migrate comes from the "kong" or "ingress" chart
