@@ -61,6 +61,10 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 	return flagSet
 }
 
+// TODO this is a basic single set, random order collection of migrations, since there's a readily available type for
+// that. should probably convert to a struct we can stick in an ordered array and then allow running different sets
+// in the order specified, to handle migrations that depend on one another.
+
 // getKeyReMaps returns a map of strings to strings. Keys are the original locations of a key in values.yaml and values
 // are their new locations. Both are in dotted string format: "foo.bar.baz" indicates a YAML structure like:
 // foo:
