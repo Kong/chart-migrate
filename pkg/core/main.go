@@ -51,8 +51,10 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 //	  baz: {}
 func getKeyReMaps() map[string]string {
 	return map[string]string{
-		"podAnnotations":        "deployment.kong.pod.annotations",
-		"deploymentAnnotations": "deployment.kong.annotations",
+		"podAnnotations":          "deployment.kong.pod.annotations",
+		"deploymentAnnotations":   "deployment.kong.annotations",
+		"ingressController.env":   "deployment.controller.pod.container.env",
+		"ingressController.image": "deployment.controller.pod.container.image",
 	}
 }
 
@@ -86,6 +88,14 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 		if err != nil {
 			logger.Error(err, "migration failed")
 		}
+		// not immediately clear why, but attempting to move AND delete within Move (the contents of Delete originally
+		// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
+		// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
+		// since we have a new []byte to work with.
+		transformed, err = Delete(start, transformed)
+		if err != nil {
+			logger.Error(err, "cleanup failed")
+		}
 	}
 
 	fmt.Printf("\n%s\n", string(transformed))
@@ -104,5 +114,13 @@ func Move(start, end string, doc []byte) ([]byte, error) {
 		return doc, fmt.Errorf("could not inject %s at %s: %w", start, end, err)
 	}
 
+	return result, nil
+}
+
+func Delete(key string, doc []byte) ([]byte, error) {
+	result, err := sjson.DeleteBytes(doc, key)
+	if err != nil {
+		return doc, fmt.Errorf("could not delete old content at %s: %w", key, err)
+	}
 	return result, nil
 }
