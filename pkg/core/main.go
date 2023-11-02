@@ -30,6 +30,9 @@ type Config struct {
 	// InputFile is the values.yaml filename to migrate.
 	InputFile string
 
+	// OutputFormat is the output format.
+	OutputFormat string
+
 	flagSet *pflag.FlagSet
 }
 
@@ -38,6 +41,7 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 
 	flagSet.StringVarP(&c.SourceChart, "source-chart", "s", "kong", `The chart of the original values.yaml, either "kong" or "ingress".`)
 	flagSet.StringVarP(&c.InputFile, "file", "f", "./values.yaml", `Path to the values.yaml to transform.`)
+	flagSet.StringVar(&c.OutputFormat, "output-format", "yaml", `Output format, either "yaml" (default) or "json"`)
 
 	c.flagSet = flagSet
 	return flagSet
@@ -98,7 +102,15 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 		}
 	}
 
-	fmt.Printf("\n%s\n", string(transformed))
+	if c.OutputFormat == "json" {
+		fmt.Printf("\n%s\n", string(transformed))
+	} else {
+		yamlOut, err := yaml.JSONToYAML(transformed)
+		if err != nil {
+			return fmt.Errorf("could not convert back to YAML: %w", err)
+		}
+		fmt.Printf("\n%s\n", string(yamlOut))
+	}
 
 	return nil
 }
