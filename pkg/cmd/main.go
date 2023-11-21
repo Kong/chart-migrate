@@ -39,7 +39,18 @@ func GetRootCmd(cfg *core.Config) *cobra.Command {
 		// the returned error and set the exit code to 1.
 		SilenceErrors: true,
 	}
+
+	merge := cobra.Command{
+		Use: "merge",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return Merge(cmd.Context(), cfg, os.Stderr)
+		},
+	}
+	merge.Flags().AddFlagSet(cfg.FlagSet())
+	cmd.AddCommand(&merge)
+
 	cmd.Flags().AddFlagSet(cfg.FlagSet())
+
 	return cmd
 }
 
@@ -52,6 +63,17 @@ func Run(ctx context.Context, c *core.Config, output io.Writer) error {
 	}
 	logger := zapr.NewLoggerWithOptions(logbase, zapr.LogInfoLevel("v"))
 	return core.Run(ctx, c, logger)
+}
+
+// Merge combines the contents of an ingress values.yaml's controller and gateway sections.
+func Merge(ctx context.Context, c *core.Config, output io.Writer) error {
+	// TODO make a logger that doesn't dump stack traces
+	logbase, err := zap.NewDevelopment()
+	if err != nil {
+		return fmt.Errorf("failed to initialize logger: %w", err)
+	}
+	logger := zapr.NewLoggerWithOptions(logbase, zapr.LogInfoLevel("v"))
+	return core.Merge(ctx, c, logger)
 }
 
 // == Envvar binding

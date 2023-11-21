@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -100,6 +101,26 @@ func getGatewayKeys() map[string]string {
 	return map[string]string{}
 }
 
+// TODO weird keys
+// proxy.* probably no longer necessary since it's only required to deal with the subchart boundary
+
+func getIngressControllerKeys() map[string]string {
+	return map[string]string{
+		"controller.ingressController.image":          "ingressController.deployment.pod.container.image",
+		"controller.ingressController.enabled":        "ingressController.deployment.enabled",
+		"controller.ingressController.args":           "ingressController.deployment.pod.container.args",
+		"controller.ingressController.env":            "ingressController.deployment.pod.container.env",
+		"controller.ingressController.customEnv":      "ingressController.deployment.pod.container.customEnv",
+		"controller.ingressController.livenessProbe":  "ingressController.deployment.pod.container.livenessProbe",
+		"controller.ingressController.readinessProbe": "ingressController.deployment.pod.container.readinessProbe",
+		"controller.ingressController.resources":      "ingressController.deployment.pod.container.resources",
+	}
+}
+
+func getIngressGatewayKeys() map[string]string {
+	return map[string]string{}
+}
+
 type mapFunc func() map[string]string
 
 const (
@@ -108,6 +129,65 @@ const (
 	kongChart        = "kong"
 	ingressChart     = "ingress"
 )
+
+type IngressValues struct {
+	Gateway    map[string]interface{} `json:"gateway,omitempty" yaml:"gateway,omitempty"`
+	Controller map[string]interface{} `json:"controller,omitempty" yaml:"controller,omitempty"`
+}
+
+func Merge(_ context.Context, c *Config, logger logr.Logger) error {
+	input, err := os.Open(c.InputFile)
+	if err != nil {
+		return fmt.Errorf("could not open input values.yaml: %w", err)
+	}
+	defer input.Close()
+	info, err := input.Stat()
+	if err != nil {
+		return fmt.Errorf("could not inspect input values.yaml: %w", err)
+	}
+
+	raw := make([]byte, info.Size())
+	_, err = input.Read(raw)
+	if err != nil {
+		return fmt.Errorf("could not read input values.yaml: %w", err)
+	}
+	// for whatever reason attempting to directly unmarshal from YAML results in an empty object
+	jsoned, err := yaml.YAMLToJSON(raw)
+	if err != nil {
+		return fmt.Errorf("could not parse input values.yaml YAML into JSON: %w", err)
+	}
+	var orig IngressValues
+	transformed := make(map[string]interface{})
+	err = json.Unmarshal(jsoned, &orig)
+	if err != nil {
+		return fmt.Errorf("could not parse input values.yaml: %w", err)
+	}
+
+	delete(orig.Gateway, "ingressController")
+	delete(orig.Gateway, "enabled")
+	delete(orig.Controller, "deployment")
+	delete(orig.Controller, "enabled")
+	delete(orig.Controller, "proxy")
+
+	for key, value := range orig.Gateway {
+		transformed[key] = value
+	}
+
+	for key, value := range orig.Controller {
+		if _, exists := transformed[key]; exists {
+			fmt.Println(fmt.Sprintf("key %s exists in both gateway and controller, using gateway", key))
+		} else {
+			transformed[key] = value
+		}
+	}
+
+	yamlOut, err := yaml.Marshal(transformed)
+	if err != nil {
+		return fmt.Errorf("could not marshal YAML: %w", err)
+	}
+	fmt.Printf("\n%s\n", string(yamlOut))
+	return nil
+}
 
 func Run(_ context.Context, c *Config, logger logr.Logger) error {
 	input, err := os.Open(c.InputFile)
@@ -153,7 +233,7 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 			// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
 			// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
 			// since we have a new []byte to work with.
-			transformed, err = Delete(start, transformed)
+			transformed, err = Delete(fullStart, transformed)
 			if err != nil {
 				logger.Error(err, "cleanup failed")
 			}
