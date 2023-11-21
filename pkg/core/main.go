@@ -87,7 +87,6 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 func getControllerKeys() map[string]string {
 	return map[string]string{
 		"ingressController.image":          "ingressController.deployment.pod.container.image",
-		"ingressController.enabled":        "ingressController.deployment.enabled",
 		"ingressController.args":           "ingressController.deployment.pod.container.args",
 		"ingressController.env":            "ingressController.deployment.pod.container.env",
 		"ingressController.customEnv":      "ingressController.deployment.pod.container.customEnv",
@@ -107,7 +106,6 @@ func getGatewayKeys() map[string]string {
 func getIngressControllerKeys() map[string]string {
 	return map[string]string{
 		"controller.ingressController.image":          "ingressController.deployment.pod.container.image",
-		"controller.ingressController.enabled":        "ingressController.deployment.enabled",
 		"controller.ingressController.args":           "ingressController.deployment.pod.container.args",
 		"controller.ingressController.env":            "ingressController.deployment.pod.container.env",
 		"controller.ingressController.customEnv":      "ingressController.deployment.pod.container.customEnv",
