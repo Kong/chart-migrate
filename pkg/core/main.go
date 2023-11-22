@@ -113,6 +113,7 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 			return fmt.Errorf("unknown source chart: %s", c.SourceChart)
 		}
 		for start, end := range remaps[prefix]() {
+			// TODO ignore or stuff not found errors elsewhere
 			transformed, err = Move(start, end, transformed)
 			if err != nil {
 				logger.Error(err, "migration failed")

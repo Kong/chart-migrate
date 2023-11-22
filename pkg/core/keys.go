@@ -53,7 +53,7 @@ func getIngressControllerKeys() map[string]string {
 		"controller.ingressController.resources":      "ingressController.deployment.pod.container.resources",
 		// remapped keys, i.e. formerly global keys that can apply to the controller
 		"controller.deployment.serviceAccount":                 "ingressController.serviceAccount",
-		"controller.deployment.hostNework":                     "ingressController.deployment.pod.hostNework",
+		"controller.deployment.hostNetwork":                    "ingressController.deployment.pod.hostNework",
 		"controller.deployment.hostname":                       "ingressController.deployment.pod.hostname",
 		"controller.deployment.tmpDir":                         "ingressController.deployment.pod.tmpDir",
 		"controller.ingressController.enabled":                 "ingressController.enabled",

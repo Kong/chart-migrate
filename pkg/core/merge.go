@@ -13,6 +13,9 @@ import (
 type IngressValues struct {
 	Gateway    map[string]interface{} `json:"gateway,omitempty" yaml:"gateway,omitempty"`
 	Controller map[string]interface{} `json:"controller,omitempty" yaml:"controller,omitempty"`
+	// IngressController should not exist in normal ingress values, only those that have first passed through the
+	// migrate command.
+	IngressController map[string]interface{} `json:"ingressController,omitempty" yaml:"ingressController,omitempty"`
 }
 
 func Merge(_ context.Context, c *Config, logger logr.Logger) error {
@@ -60,6 +63,8 @@ func Merge(_ context.Context, c *Config, logger logr.Logger) error {
 			transformed[key] = value
 		}
 	}
+
+	transformed["ingressController"] = orig.IngressController
 
 	yamlOut, err := yaml.Marshal(transformed)
 	if err != nil {
