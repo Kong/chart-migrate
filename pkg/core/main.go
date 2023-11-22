@@ -93,18 +93,27 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 	// Keep a copy of the original to diff later.
 	transformed = orig
 
-	remaps := map[string]mapFunc{
+	kongRemaps := map[string]mapFunc{
 		controllerPrefix: getControllerKeys,
 		gatewayPrefix:    getGatewayKeys,
 	}
 
+	ingressRemaps := map[string]mapFunc{
+		controllerPrefix: getIngressControllerKeys,
+		gatewayPrefix:    getIngressGatewayKeys,
+	}
+
 	for _, prefix := range []string{controllerPrefix, gatewayPrefix} {
+		var remaps map[string]mapFunc
+		if c.SourceChart == ingressChart {
+			remaps = ingressRemaps
+		} else if c.SourceChart == ingressChart {
+			remaps = kongRemaps
+		} else {
+			return fmt.Errorf("unknown source chart: %s", c.SourceChart)
+		}
 		for start, end := range remaps[prefix]() {
-			fullStart := start
-			if c.SourceChart == ingressChart {
-				fullStart = fmt.Sprintf("%s.%s", prefix, start)
-			}
-			transformed, err = Move(fullStart, end, transformed)
+			transformed, err = Move(start, end, transformed)
 			if err != nil {
 				logger.Error(err, "migration failed")
 			}
@@ -112,7 +121,7 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 			// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
 			// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
 			// since we have a new []byte to work with.
-			transformed, err = Delete(fullStart, transformed)
+			transformed, err = Delete(start, transformed)
 			if err != nil {
 				logger.Error(err, "cleanup failed")
 			}
