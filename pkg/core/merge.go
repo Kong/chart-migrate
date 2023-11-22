@@ -48,7 +48,6 @@ func Merge(_ context.Context, c *Config, logger logr.Logger) error {
 
 	delete(orig.Gateway, "ingressController")
 	delete(orig.Gateway, "enabled")
-	delete(orig.Controller, "deployment")
 	delete(orig.Controller, "enabled")
 	delete(orig.Controller, "proxy")
 
