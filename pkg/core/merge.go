@@ -18,6 +18,9 @@ type IngressValues struct {
 	IngressController map[string]interface{} `json:"ingressController,omitempty" yaml:"ingressController,omitempty"`
 }
 
+// Merge combines the "controller" and "gateway" sections of an "ingress" chart values.yaml into a single root-level
+// collection of settings for use with the 3.x "kong" chart. It must be run after an initial pass of the main command
+// to migrate moved keys to their new locations.
 func Merge(_ context.Context, c *Config, logger logr.Logger) error {
 	input, err := os.Open(c.InputFile)
 	if err != nil {
