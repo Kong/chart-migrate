@@ -51,26 +51,36 @@ const (
 	ingressChart     = "ingress"
 )
 
-func Run(_ context.Context, c *Config, logger logr.Logger) error {
+func RunOut(ctx context.Context, c *Config, logger logr.Logger) error {
+	output, err := Run(ctx, c, logger)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s", string(output))
+	return nil
+
+}
+
+func Run(_ context.Context, c *Config, logger logr.Logger) (string, error) {
 	input, err := os.Open(c.InputFile)
 	if err != nil {
-		return fmt.Errorf("could not open input values.yaml: %w", err)
+		return "", fmt.Errorf("could not open input values.yaml: %w", err)
 	}
 	defer input.Close()
 	info, err := input.Stat()
 	if err != nil {
-		return fmt.Errorf("could not inspect input values.yaml: %w", err)
+		return "", fmt.Errorf("could not inspect input values.yaml: %w", err)
 	}
 
 	raw := make([]byte, info.Size())
 	var orig, transformed []byte
 	_, err = input.Read(raw)
 	if err != nil {
-		return fmt.Errorf("could not read input values.yaml: %w", err)
+		return "", fmt.Errorf("could not read input values.yaml: %w", err)
 	}
 	orig, err = yaml.YAMLToJSON(raw)
 	if err != nil {
-		return fmt.Errorf("could not parse input values.yaml YAML into JSON: %w", err)
+		return "", fmt.Errorf("could not parse input values.yaml YAML into JSON: %w", err)
 	}
 
 	// Keep a copy of the original to diff later.
@@ -90,10 +100,10 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 		var remaps map[string]mapFunc
 		if c.SourceChart == ingressChart {
 			remaps = ingressRemaps
-		} else if c.SourceChart == ingressChart {
+		} else if c.SourceChart == kongChart {
 			remaps = kongRemaps
 		} else {
-			return fmt.Errorf("unknown source chart: %s", c.SourceChart)
+			return "", fmt.Errorf("unknown source chart: %s", c.SourceChart)
 		}
 		for start, end := range remaps[prefix]() {
 			// TODO ignore or stuff not found errors elsewhere
@@ -113,16 +123,13 @@ func Run(_ context.Context, c *Config, logger logr.Logger) error {
 	}
 
 	if c.OutputFormat == "json" {
-		fmt.Printf("\n%s\n", string(transformed))
-	} else {
-		yamlOut, err := yaml.JSONToYAML(transformed)
-		if err != nil {
-			return fmt.Errorf("could not convert back to YAML: %w", err)
-		}
-		fmt.Printf("\n%s\n", string(yamlOut))
+		return string(transformed), nil
 	}
-
-	return nil
+	yamlOut, err := yaml.JSONToYAML(transformed)
+	if err != nil {
+		return "", fmt.Errorf("could not convert back to YAML: %w", err)
+	}
+	return string(yamlOut), nil
 }
 
 func Move(start, end string, doc []byte) ([]byte, error) {

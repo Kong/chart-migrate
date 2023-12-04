@@ -31,14 +31,20 @@ func Execute() {
 func GetRootCmd(cfg *core.Config) *cobra.Command {
 	cmd := &cobra.Command{
 		PersistentPreRunE: bindEnvVars,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return Run(cmd.Context(), cfg, os.Stderr)
-		},
-		SilenceUsage: true,
+		SilenceUsage:      true,
 		// We can silence the errors because cobra.CheckErr below will print
 		// the returned error and set the exit code to 1.
 		SilenceErrors: true,
 	}
+
+	migrate := cobra.Command{
+		Use: "migrate",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return Run(cmd.Context(), cfg, os.Stderr)
+		},
+	}
+	migrate.Flags().AddFlagSet(cfg.FlagSet())
+	cmd.AddCommand(&migrate)
 
 	merge := cobra.Command{
 		Use: "merge",
@@ -62,7 +68,7 @@ func Run(ctx context.Context, c *core.Config, output io.Writer) error {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 	logger := zapr.NewLoggerWithOptions(logbase, zapr.LogInfoLevel("v"))
-	return core.Run(ctx, c, logger)
+	return core.RunOut(ctx, c, logger)
 }
 
 // Merge combines the contents of an ingress values.yaml's controller and gateway sections.
@@ -73,7 +79,7 @@ func Merge(ctx context.Context, c *core.Config, output io.Writer) error {
 		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
 	logger := zapr.NewLoggerWithOptions(logbase, zapr.LogInfoLevel("v"))
-	return core.Merge(ctx, c, logger)
+	return core.MergeOut(ctx, c, logger)
 }
 
 // == Envvar binding

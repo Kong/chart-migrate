@@ -18,35 +18,44 @@ type IngressValues struct {
 	IngressController map[string]interface{} `json:"ingressController,omitempty" yaml:"ingressController,omitempty"`
 }
 
+func MergeOut(ctx context.Context, c *Config, logger logr.Logger) error {
+	output, err := Merge(ctx, c, logger)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("%s", string(output))
+	return nil
+}
+
 // Merge combines the "controller" and "gateway" sections of an "ingress" chart values.yaml into a single root-level
 // collection of settings for use with the 3.x "kong" chart. It must be run after an initial pass of the main command
 // to migrate moved keys to their new locations.
-func Merge(_ context.Context, c *Config, logger logr.Logger) error {
+func Merge(_ context.Context, c *Config, logger logr.Logger) (string, error) {
 	input, err := os.Open(c.InputFile)
 	if err != nil {
-		return fmt.Errorf("could not open input values.yaml: %w", err)
+		return "", fmt.Errorf("could not open input values.yaml: %w", err)
 	}
 	defer input.Close()
 	info, err := input.Stat()
 	if err != nil {
-		return fmt.Errorf("could not inspect input values.yaml: %w", err)
+		return "", fmt.Errorf("could not inspect input values.yaml: %w", err)
 	}
 
 	raw := make([]byte, info.Size())
 	_, err = input.Read(raw)
 	if err != nil {
-		return fmt.Errorf("could not read input values.yaml: %w", err)
+		return "", fmt.Errorf("could not read input values.yaml: %w", err)
 	}
 	// for whatever reason attempting to directly unmarshal from YAML results in an empty object
 	jsoned, err := yaml.YAMLToJSON(raw)
 	if err != nil {
-		return fmt.Errorf("could not parse input values.yaml YAML into JSON: %w", err)
+		return "", fmt.Errorf("could not parse input values.yaml YAML into JSON: %w", err)
 	}
 	var orig IngressValues
 	transformed := make(map[string]interface{})
 	err = json.Unmarshal(jsoned, &orig)
 	if err != nil {
-		return fmt.Errorf("could not parse input values.yaml: %w", err)
+		return "", fmt.Errorf("could not parse input values.yaml: %w", err)
 	}
 
 	delete(orig.Gateway, "ingressController")
@@ -60,7 +69,7 @@ func Merge(_ context.Context, c *Config, logger logr.Logger) error {
 
 	for key, value := range orig.Controller {
 		if _, exists := transformed[key]; exists {
-			fmt.Println(fmt.Sprintf("key %s exists in both gateway and controller, using gateway", key))
+			logger.Info("key exists in both gateway and controller, using gateway", "key", key)
 		} else {
 			transformed[key] = value
 		}
@@ -70,8 +79,7 @@ func Merge(_ context.Context, c *Config, logger logr.Logger) error {
 
 	yamlOut, err := yaml.Marshal(transformed)
 	if err != nil {
-		return fmt.Errorf("could not marshal YAML: %w", err)
+		return "", fmt.Errorf("could not marshal YAML: %w", err)
 	}
-	fmt.Printf("\n%s\n", string(yamlOut))
-	return nil
+	return string(yamlOut), nil
 }
