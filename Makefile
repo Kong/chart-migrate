@@ -33,6 +33,14 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+.PHONY: test.integration
+test.integration:
+		GOFLAGS="-tags=integration_tests" \
+		go test $(GOTESTFLAGS) \
+		-v \
+		-race \
+		./test/integration
+
 .PHONY: test.golden.update
 test.golden.update:
 	@./hack/update-golden.sh
