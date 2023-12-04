@@ -1,0 +1,30 @@
+name: golden tests
+
+on:
+  pull_request:
+    branches:
+      - '**'
+  push:
+    branches:
+      - 'main'
+      - 'release/[0-9]+.[0-9]+.x'
+    tags:
+      - '**'
+  workflow_dispatch: {}
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: setup golang
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: go.mod
+
+      - name: run integration tests
+        run: make test.integration
