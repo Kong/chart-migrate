@@ -1,0 +1,21 @@
+admin:
+  clusterIP: None
+  enabled: true
+  type: ClusterIP
+deployment:
+  kong:
+    enabled: true
+env:
+  database: "off"
+  role: traditional
+ingressController:
+  deployment:
+    pod:
+      annotations:
+        kuma.io/gateway: enabled
+        traffic.kuma.io/exclude-outbound-ports: "8444"
+        traffic.sidecar.istio.io/excludeOutboundPorts: "8444"
+  enabled: true
+  gatewayDiscovery:
+    enabled: true
+    generateAdminApiService: true
