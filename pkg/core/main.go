@@ -106,18 +106,20 @@ func Run(_ context.Context, c *Config, logger logr.Logger) (string, error) {
 			return "", fmt.Errorf("unknown source chart: %s", c.SourceChart)
 		}
 		for start, end := range remaps[prefix]() {
-			// TODO ignore or stuff not found errors elsewhere
-			transformed, err = Move(start, end, transformed)
+			var found bool
+			transformed, found, err = Move(start, end, transformed)
 			if err != nil {
 				logger.Error(err, "migration failed")
 			}
-			// not immediately clear why, but attempting to move AND delete within Move (the contents of Delete originally
-			// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
-			// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
-			// since we have a new []byte to work with.
-			transformed, err = Delete(start, transformed)
-			if err != nil {
-				logger.Error(err, "cleanup failed")
+			if found {
+				// not immediately clear why, but attempting to move AND delete within Move (the contents of Delete originally
+				// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
+				// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
+				// since we have a new []byte to work with.
+				transformed, err = Delete(start, transformed)
+				if err != nil {
+					logger.Error(err, "cleanup failed")
+				}
 			}
 		}
 	}
@@ -132,18 +134,18 @@ func Run(_ context.Context, c *Config, logger logr.Logger) (string, error) {
 	return string(yamlOut), nil
 }
 
-func Move(start, end string, doc []byte) ([]byte, error) {
+func Move(start, end string, doc []byte) ([]byte, bool, error) {
 	found := gjson.GetBytes(doc, start)
 	if !found.Exists() {
-		return doc, fmt.Errorf("key %s for target %s not found", start, end)
+		return doc, false, nil
 	}
 
 	result, err := sjson.SetBytes(doc, end, found.Value())
 	if err != nil {
-		return doc, fmt.Errorf("could not inject %s at %s: %w", start, end, err)
+		return doc, true, fmt.Errorf("could not inject %s at %s: %w", start, end, err)
 	}
 
-	return result, nil
+	return result, true, nil
 }
 
 func Delete(key string, doc []byte) ([]byte, error) {
