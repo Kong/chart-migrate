@@ -7,9 +7,9 @@
 If coming from the `kong` chart, run only the root command. Keys whose names have changed will be moved to their new location.
 
 ```
-go run ./pkg/cmd -f /tmp/mutate_values.yaml
-go run ./pkg/cmd -f /tmp/mutate_values.yaml --output-format=json
-go run ./pkg/cmd -f /tmp/mutate_values.yaml --output-format=json| jq .deployment,.podAnnotations
+go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml
+go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml --output-format=json
+go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml --output-format=json| jq .deployment,.podAnnotations
 ```
 
 ```
@@ -95,7 +95,7 @@ If a key is present under both `ingress` and `gateway`, it will use the `gateway
 not occur, as `ingress` keys that would collide with `gateway` keys should have all moved to new locations during the first step.
 
 ```
-$ go run ./pkg/cmd -f /tmp/ingvalues.yaml -s ingress 2>/dev/null | tee /tmp/movvalues.yaml 
+$ go run ./pkg/cmd migrate -f /tmp/ingvalues.yaml -s ingress 2>/dev/null | tee /tmp/movvalues.yaml 
 
 controller:
   deployment:
