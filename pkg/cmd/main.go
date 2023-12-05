@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/kong/chart-migrate/pkg/core"
 )
@@ -62,23 +63,13 @@ func GetRootCmd(cfg *core.Config) *cobra.Command {
 
 // Run runs the migration application.
 func Run(ctx context.Context, c *core.Config, output io.Writer) error {
-	// TODO make a logger that doesn't dump stack traces
-	logbase, err := zap.NewDevelopment()
-	if err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
-	}
-	logger := zapr.NewLoggerWithOptions(logbase, zapr.LogInfoLevel("v"))
+	logger := zapr.NewLoggerWithOptions(getZapLogger(), zapr.LogInfoLevel("v"))
 	return core.RunOut(ctx, c, logger)
 }
 
 // Merge combines the contents of an ingress values.yaml's controller and gateway sections.
 func Merge(ctx context.Context, c *core.Config, output io.Writer) error {
-	// TODO make a logger that doesn't dump stack traces
-	logbase, err := zap.NewDevelopment()
-	if err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
-	}
-	logger := zapr.NewLoggerWithOptions(logbase, zapr.LogInfoLevel("v"))
+	logger := zapr.NewLoggerWithOptions(getZapLogger(), zapr.LogInfoLevel("v"))
 	return core.MergeOut(ctx, c, logger)
 }
 
@@ -110,4 +101,26 @@ func bindEnvVars(cmd *cobra.Command, _ []string) (err error) {
 	})
 
 	return
+}
+
+func getZapLogger() *zap.Logger {
+	encoder := zapcore.NewConsoleEncoder(zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		FunctionKey:    zapcore.OmitKey,
+		MessageKey:     "msg",
+		StacktraceKey:  zapcore.OmitKey,
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.RFC3339TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+	})
+	levelFunc := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+		return lvl >= zap.InfoLevel
+	})
+	core := zapcore.NewCore(encoder, zapcore.AddSync(os.Stderr), levelFunc)
+	return zap.New(core)
 }
