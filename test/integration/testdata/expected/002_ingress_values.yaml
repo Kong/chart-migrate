@@ -9,13 +9,81 @@ env:
   database: "off"
   role: traditional
 ingressController:
+  adminApi:
+    tls:
+      client:
+        enabled: true
   deployment:
+    annotations:
+      example.com/bar: bar
+      example.com/foo: foo
     pod:
       annotations:
         kuma.io/gateway: enabled
         traffic.kuma.io/exclude-outbound-ports: "8444"
         traffic.sidecar.istio.io/excludeOutboundPorts: "8444"
+      container:
+        args:
+        - --dump-config
+        - "true"
+        customEnv:
+          FAKE: whatever
+          TZ: Europe/Berlin
+        env:
+          election_id: palmtree
+          kong_admin_tls_skip_verify: true
+        image:
+          repository: kong/kubernetes-ingress-controller
+          tag: "3.0"
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 10254
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 100m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        securityContext:
+          readOnlyRootFilesystem: false
+      labels:
+        example.com/bar: bar
+        example.com/foo: foo
+      nodeSelector: whatever
+      priorityClassName: whatever
+      securityContext:
+        something: whatever
+      terminationGracePeriodSeconds: 111
+      tolerations:
+        fakeNonsense: idk the actual format
+    replicaCount: 3
   enabled: true
   gatewayDiscovery:
     enabled: true
     generateAdminApiService: true
+  ingressClass: kong
+  konnect:
+    runtimeGroupID: abc123
+  rbac:
+    create: true
+  watchNamespaces:
+  - default
+  - other

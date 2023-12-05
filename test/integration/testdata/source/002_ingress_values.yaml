@@ -4,6 +4,7 @@ deployment:
 
 controller:
   proxy:
+    # this should _not_ carry over into the migrated values.yaml
     nameOverride: "{{ .Release.Name }}-gateway-proxy"
 
   enabled: true
@@ -14,10 +15,79 @@ controller:
 
   ingressController:
     enabled: true
+    image:
+      repository: kong/kubernetes-ingress-controller
+      tag: "3.0"
+    args:
+    - --dump-config
+    - "true"
+  
+    env:
+      kong_admin_tls_skip_verify: true
+      election_id: palmtree
+    customEnv:
+      TZ: "Europe/Berlin"
+      FAKE: "whatever"
+  
+    livenessProbe:
+      httpGet:
+        path: "/healthz"
+        port: 10254
+        scheme: HTTP
+      initialDelaySeconds: 5
+      timeoutSeconds: 5
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
+    readinessProbe:
+      httpGet:
+        path: "/readyz"
+        port: 10254
+        scheme: HTTP
+      initialDelaySeconds: 5
+      timeoutSeconds: 5
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
+    resources:
+      limits:
+        cpu: 100m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+
+    serviceAccount: "my-account"
+    hostNetwork: true
+    tmpDir:
+      sizeLimit: 1Gi
+    watchNamespaces:
+    - default
+    - other
+    ingressClass: "kong"
+    ingressClassAnnoations:
+      example.com/foo: foo
+      example.com/bar: bar
+    rbac:
+      create: true
+    konnect:
+      runtimeGroupID: abc123
+
+    adminApi:
+      tls:
+        client:
+          enabled: true
+
 
     gatewayDiscovery:
       enabled: true
       generateAdminApiService: true
+
+  terminationGracePeriodSeconds: 111
+  tolerations:
+    fakeNonsense: "idk the actual format"
+  nodeSelector: "whatever"
+  priorityClassName: "whatever"
 
   podAnnotations:
     kuma.io/gateway: enabled
@@ -26,6 +96,22 @@ controller:
     # to use that value.
     traffic.kuma.io/exclude-outbound-ports: "8444"
     traffic.sidecar.istio.io/excludeOutboundPorts: "8444"
+
+  podLabels:
+    example.com/foo: foo
+    example.com/bar: bar
+
+  deploymentAnnotations:
+    example.com/foo: foo
+    example.com/bar: bar
+
+  replicaCount: 3
+
+  securityContext:
+    something: "whatever"
+
+  containerSecurityContext:
+    readOnlyRootFilesystem: false
 
 gateway:
   enabled: true
