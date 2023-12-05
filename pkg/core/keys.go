@@ -48,7 +48,6 @@ func getIngressControllerKeys() map[string]string {
 		"controller.ingressController.konnect":                 "ingressController.konnect",
 		"controller.ingressController.adminApi":                "ingressController.adminApi",
 		"controller.updateStrategy":                            "ingressController.deployment.updateStrategy",
-		"controller.resources":                                 "ingressController.deployment.pod.container.resources",
 		"controller.terminationGracePeriodSeconds":             "ingressController.deployment.pod.terminationGracePeriodSeconds",
 		"controller.tolerations":                               "ingressController.deployment.pod.tolerations",
 		"controller.nodeSelector":                              "ingressController.deployment.pod.nodeSelector",
