@@ -45,12 +45,11 @@ func (c *Config) FlagSet() *pflag.FlagSet {
 }
 
 const (
-	controllerPrefix = "controller"
-	gatewayPrefix    = "gateway"
-	kongChart        = "kong"
-	ingressChart     = "ingress"
+	kongChart    = "kong"
+	ingressChart = "ingress"
 )
 
+// RunOut runs Run and prints its result to stdout.
 func RunOut(ctx context.Context, c *Config, logger logr.Logger) error {
 	output, err := Run(ctx, c, logger)
 	if err != nil {
@@ -61,65 +60,44 @@ func RunOut(ctx context.Context, c *Config, logger logr.Logger) error {
 
 }
 
+// Run takes a configuration string and returns a migrated configuration string.
 func Run(_ context.Context, c *Config, logger logr.Logger) (string, error) {
-	input, err := os.Open(c.InputFile)
+	raw, err := os.ReadFile(c.InputFile)
 	if err != nil {
-		return "", fmt.Errorf("could not open input values.yaml: %w", err)
+		return "", fmt.Errorf("could not read %s: %w", c.InputFile, err)
 	}
-	defer input.Close()
-	info, err := input.Stat()
-	if err != nil {
-		return "", fmt.Errorf("could not inspect input values.yaml: %w", err)
-	}
-
-	raw := make([]byte, info.Size())
-	var orig, transformed []byte
-	_, err = input.Read(raw)
-	if err != nil {
-		return "", fmt.Errorf("could not read input values.yaml: %w", err)
-	}
-	orig, err = yaml.YAMLToJSON(raw)
+	orig, err := yaml.YAMLToJSON(raw)
 	if err != nil {
 		return "", fmt.Errorf("could not parse input values.yaml YAML into JSON: %w", err)
 	}
 
 	// Keep a copy of the original to diff later.
-	transformed = orig
+	transformed := orig
 
-	kongRemaps := map[string]mapFunc{
-		controllerPrefix: getControllerKeys,
-		gatewayPrefix:    getGatewayKeys,
+	var remaps mapFunc
+	switch originChart := c.SourceChart; originChart {
+	case ingressChart:
+		remaps = getIngressKeys
+	case kongChart:
+		remaps = getKongKeys
+	default:
+		return "", fmt.Errorf("unknown source chart: %s", originChart)
 	}
 
-	ingressRemaps := map[string]mapFunc{
-		controllerPrefix: getIngressControllerKeys,
-		gatewayPrefix:    getIngressGatewayKeys,
-	}
-
-	for _, prefix := range []string{controllerPrefix, gatewayPrefix} {
-		var remaps map[string]mapFunc
-		if c.SourceChart == ingressChart {
-			remaps = ingressRemaps
-		} else if c.SourceChart == kongChart {
-			remaps = kongRemaps
-		} else {
-			return "", fmt.Errorf("unknown source chart: %s", c.SourceChart)
+	for start, end := range remaps() {
+		var found bool
+		transformed, found, err = Move(start, end, transformed)
+		if err != nil {
+			logger.Error(err, "migration failed")
 		}
-		for start, end := range remaps[prefix]() {
-			var found bool
-			transformed, found, err = Move(start, end, transformed)
+		if found {
+			// not immediately clear why, but attempting to move AND delete within Move (the contents of Delete originally
+			// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
+			// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
+			// since we have a new []byte to work with.
+			transformed, err = Delete(start, transformed)
 			if err != nil {
-				logger.Error(err, "migration failed")
-			}
-			if found {
-				// not immediately clear why, but attempting to move AND delete within Move (the contents of Delete originally
-				// followed the sjson.SetBytes() call and error check) resulted in it deleting both the old and new key.
-				// Presumably something about how it addresses the values internally. Returning and then deleting avoids this,
-				// since we have a new []byte to work with.
-				transformed, err = Delete(start, transformed)
-				if err != nil {
-					logger.Error(err, "cleanup failed")
-				}
+				logger.Error(err, "cleanup failed")
 			}
 		}
 	}
@@ -134,6 +112,9 @@ func Run(_ context.Context, c *Config, logger logr.Logger) (string, error) {
 	return string(yamlOut), nil
 }
 
+// Move takes a start and end JSON path string and a document, and returns a document with the start path moved to the
+// end path. It also returns a boolean indicating if the start path is not present, in which case the input document is
+// returned unmodified.
 func Move(start, end string, doc []byte) ([]byte, bool, error) {
 	found := gjson.GetBytes(doc, start)
 	if !found.Exists() {
@@ -148,6 +129,7 @@ func Move(start, end string, doc []byte) ([]byte, bool, error) {
 	return result, true, nil
 }
 
+// Delete takes a JSON path and JSON document and returns a JSON document with the input path deleted.
 func Delete(key string, doc []byte) ([]byte, error) {
 	result, err := sjson.DeleteBytes(doc, key)
 	if err != nil {
