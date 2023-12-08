@@ -42,14 +42,7 @@ func Test_Migrate(t *testing.T) {
 
 			logger := zapr.NewLogger(zap.NewNop())
 
-			expectedFile, err := os.Open(tc.expectedFile)
-			require.NoError(t, err)
-			defer expectedFile.Close()
-			info, err := expectedFile.Stat()
-			require.NoError(t, err)
-
-			expected := make([]byte, info.Size())
-			_, err = expectedFile.Read(expected)
+			expected, err := os.ReadFile(tc.expectedFile)
 			require.NoError(t, err)
 
 			result, err := core.Run(context.Background(), &config, logger)
@@ -87,14 +80,7 @@ func Test_MergeMigrate(t *testing.T) {
 
 			logger := zapr.NewLogger(zap.NewNop())
 
-			expectedFile, err := os.Open(tc.expectedFile)
-			require.NoError(t, err)
-			defer expectedFile.Close()
-			info, err := expectedFile.Stat()
-			require.NoError(t, err)
-
-			expected := make([]byte, info.Size())
-			_, err = expectedFile.Read(expected)
+			expected, err := os.ReadFile(tc.expectedFile)
 			require.NoError(t, err)
 
 			migrateResult, err := core.Run(context.Background(), &config, logger)

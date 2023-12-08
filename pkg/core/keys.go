@@ -6,7 +6,7 @@ package core
 // proxy. Leaving them as-is (so that they now apply to the proxy) isn't an ideal solution, but it is the simplest.
 
 // getControllerKeys returns a map of existing key locations to their new locations for the "kong" chart.
-func getControllerKeys() map[string]string {
+func getKongKeys() map[string]string {
 	return map[string]string{
 		"ingressController.image":          "ingressController.deployment.pod.container.image",
 		"ingressController.args":           "ingressController.deployment.pod.container.args",
@@ -18,12 +18,8 @@ func getControllerKeys() map[string]string {
 	}
 }
 
-func getGatewayKeys() map[string]string {
-	return map[string]string{}
-}
-
 // getIngressControllerKeys returns a map of existing key locations to their new locations for the "ingress" chart.
-func getIngressControllerKeys() map[string]string {
+func getIngressKeys() map[string]string {
 	return map[string]string{
 		// moved keys, basically getControllerKeys() with a controller. prefix
 		"controller.ingressController.image":          "ingressController.deployment.pod.container.image",
@@ -59,10 +55,6 @@ func getIngressControllerKeys() map[string]string {
 		"controller.securityContext":                           "ingressController.deployment.pod.securityContext",
 		"controller.containerSecurityContext":                  "ingressController.deployment.pod.container.securityContext",
 	}
-}
-
-func getIngressGatewayKeys() map[string]string {
-	return map[string]string{}
 }
 
 type mapFunc func() map[string]string
