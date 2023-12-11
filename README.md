@@ -1,81 +1,91 @@
 # chart-migrate
 
+## Installation
+
+Release archives are available from the [chart-migrate releases
+page](https://github.com/Kong/chart-migrate/releases) for common platforms and
+architectures. `chart-migrate` is a self-contained application: you can extract
+the archive and execute the `chart-migrate` executable without any additional
+installation steps.
+
 ## Basic example invocations
 
 ### Kong chart
 
-If coming from the `kong` chart, run only the root command. Keys whose names have changed will be moved to their new location.
+If coming from the `kong` chart, run only the `migrate` command. Keys whose
+names have changed will be moved to their new location. For example:
 
 ```
-go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml
-go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml --output-format=json
-go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml --output-format=json| jq .deployment,.podAnnotations
+./chart-migrate migrate -f /tmp/values.yaml > /tmp/migrated.yaml
 ```
 
+If you inspect the original and output values, you can see that migrated fields
+are now present at new locations:
+
 ```
-17:22:40-0700 esenin $ cat /tmp/mutate_values.yaml | python -c 'import json, sys, yaml ; y=yaml.safe_load(sys.stdin.read()) ; print(json.dumps(y))' | jq .deployment,.podAnnotations
+$ cat /tmp/values.yaml | python -c 'import json, sys, yaml ; y=yaml.safe_load(sys.stdin.read()) ; print(json.dumps(y))' | jq .ingressController.image
 {
-  "kong": {
-    "enabled": true
-  },
-  "serviceAccount": {
-    "create": true,
-    "automountServiceAccountToken": false
-  },
-  "test": {
-    "enabled": false
-  },
-  "daemonset": false,
-  "hostNetwork": false,
-  "prefixDir": {
-    "sizeLimit": "256Mi"
-  },
-  "tmpDir": {
-    "sizeLimit": "1Gi"
-  }
+  "repository": "kong/kubernetes-ingress-controller",
+  "tag": "3.0",
+  "effectiveSemver": null
 }
+
+
+$ ./chart-migrate migrate -f /tmp/values.yaml --output-format=json | jq .ingressController.image,.ingressController.deployment.pod.container.image
+null
+{
+  "effectiveSemver": null,
+  "repository": "kong/kubernetes-ingress-controller",
+  "tag": "3.0"
+}
+```
+
+### Ingress chart
+
+If coming from the `ingress` chart, first run the `migrate` command with `-s
+ingress` and then the `merge` command on the output.
+
+```
+./chart-migrate migrate -f /tmp/values.yaml -s ingress > /tmp/migrated.yaml
+./chart-migrate merge -f /tmp/migrated.yaml > /tmp/merged.yaml
+```
+
+The `migrate` command will move settings from `controller` that apply to the
+Deployment/Pod/etc. to the appropriate `ingressController` subsection.
+
+The `merge` command will move all remaining sections from under the
+`controller` and `gateway` sections into their equivalent root-level settings.
+
+If a key is present under both `ingress` and `gateway`, it will use the
+`gateway` value and print an alert. This should not occur, as `ingress` keys
+that would collide with `gateway` keys should have all moved to new locations
+during the first step.
+
+For example, the initial `migrate` command  will create a root-level
+`ingressController` section with the migrated controller keys:
+
+```
+$ cat /tmp/values.yaml | python -c 'import json, sys, yaml ; y=yaml.safe_load(sys.stdin.read()) ; print(json.dumps(y))' | jq .ingressController,.controller.podAnnotations
+null
 {
   "kuma.io/gateway": "enabled",
-  "traffic.sidecar.istio.io/includeInboundPorts": ""
+  "traffic.kuma.io/exclude-outbound-ports": "8444",
+  "traffic.sidecar.istio.io/excludeOutboundPorts": "8444"
 }
-17:22:47-0700 esenin $ go run ./pkg/cmd -f /tmp/mutate_values.yaml --output-format=json | jq .deployment,.podAnnotations                                                                                       
+
+$ ./chart-migrate migrate -f /tmp/values.yaml --output-format=json -s ingress | jq .ingressController,.ingress.podAnnotations
 {
-  "daemonset": false,
-  "hostNetwork": false,
-  "kong": {
+  "enabled": true,
+  "gatewayDiscovery": {
     "enabled": true,
+    "generateAdminApiService": true
+  },
+  "deployment": {
     "pod": {
       "annotations": {
         "kuma.io/gateway": "enabled",
-        "traffic.sidecar.istio.io/includeInboundPorts": ""
-      }
-    },
-    "annotations": {}
-  },
-  "prefixDir": {
-    "sizeLimit": "256Mi"
-  },
-  "serviceAccount": {
-    "automountServiceAccountToken": false,
-    "create": true
-  },
-  "test": {
-    "enabled": false
-  },
-  "tmpDir": {
-    "sizeLimit": "1Gi"
-  },
-  "controller": {
-    "pod": {
-      "container": {
-        "env": {
-          "kong_admin_tls_skip_verify": true
-        },
-        "image": {
-          "effectiveSemver": null,
-          "repository": "kong/kubernetes-ingress-controller",
-          "tag": "2.12"
-        }
+        "traffic.kuma.io/exclude-outbound-ports": "8444",
+        "traffic.sidecar.istio.io/excludeOutboundPorts": "8444"
       }
     }
   }
@@ -83,103 +93,24 @@ go run ./pkg/cmd migrate -f /tmp/mutate_values.yaml --output-format=json| jq .de
 null
 ```
 
-### Ingress chart
-
-If coming from the `ingress` chart, first run the root command and then the `merge` command on the output.
-
-The root command will move settings from `ingress` that apply to the Deployment/Pod/etc. and will now live under
-the `kong` chart's `ingressController` section to their appropriate `kong` key.
-
-The `merge` command will move any remaining settings from `ingress` and `gateway` sections to the root of values.yaml.
-If a key is present under both `ingress` and `gateway`, it will use the `gateway` value and print an alert. This should
-not occur, as `ingress` keys that would collide with `gateway` keys should have all moved to new locations during the first step.
+`migrate` alone will leave most keys under `gateway` and `controller` at their
+original location. For example, the `env` key will still be under `gateway`.
+Running `merge` moves these keys to their root-level sections:
 
 ```
-$ go run ./pkg/cmd migrate -f /tmp/ingvalues.yaml -s ingress 2>/dev/null | tee /tmp/movvalues.yaml 
+$ ./chart-migrate migrate -f /tmp/values.yaml -s ingress > /tmp/migrated.yaml
 
-controller:
-  deployment:
-    kong:
-      enabled: false
-  enabled: true
-  ingressController: {}
-  proxy:
-    nameOverride: '{{ .Release.Name }}-gateway-proxy'
-gateway:
-  admin:
-    clusterIP: None
-    enabled: true
-    type: ClusterIP
-  deployment:
-    kong:
-      enabled: true
-  enabled: true
-  env:
-    database: "off"
-    role: traditional
-  ingressController:
-    enabled: false
-  podAnnotations:
-    example.com/gateway: bongo
-ingressController:
-  deployment:
-    annotations:
-      example.com/example: whatever
-    pod:
-      annotations:
-        kuma.io/gateway: enabled
-        traffic.kuma.io/exclude-outbound-ports: "8444"
-        traffic.sidecar.istio.io/excludeOutboundPorts: "8444"
-      container:
-        env:
-          dump_config: true
-        image:
-          repository: traines/kic
-      hostNework: true
-      terminationGracePeriodSeconds: 20
-      tmpDir:
-        sizeLimit: 2Gi
-  enabled: true
-  gatewayDiscovery:
-    enabled: true
-    generateAdminApiService: true
-```
+$ ./chart-migrate migrate -f /tmp/values.yaml -s ingress --output-format=json | jq .gateway.env,.env
+{
+  "database": "off",
+  "role": "traditional"
+}
+null
 
-```
-$ go run ./pkg/cmd -f /tmp/movvalues.yaml -s ingress merge                                
-
-admin:
-  clusterIP: None
-  enabled: true
-  type: ClusterIP
-deployment:
-  kong:
-    enabled: true
-env:
-  database: "off"
-  role: traditional
-ingressController:
-  deployment:
-    annotations:
-      example.com/example: whatever
-    pod:
-      annotations:
-        kuma.io/gateway: enabled
-        traffic.kuma.io/exclude-outbound-ports: "8444"
-        traffic.sidecar.istio.io/excludeOutboundPorts: "8444"
-      container:
-        env:
-          dump_config: true
-        image:
-          repository: traines/kic
-      hostNework: true
-      terminationGracePeriodSeconds: 20
-      tmpDir:
-        sizeLimit: 2Gi
-  enabled: true
-  gatewayDiscovery:
-    enabled: true
-    generateAdminApiService: true
-podAnnotations:
-  example.com/gateway: bongo
+$ ./chart-migrate merge -f /tmp/migrated.yaml | python -c 'import json, sys, yaml ; y=yaml.safe_load(sys.stdin.read()) ; print(json.dumps(y))' | jq .gateway.env,.env
+null
+{
+  "database": "off",
+  "role": "traditional"
+}
 ```
