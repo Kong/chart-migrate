@@ -5,7 +5,7 @@ package core
 // There's unfortunately no way to know if individual annotations and the like were in place for the controller or
 // proxy. Leaving them as-is (so that they now apply to the proxy) isn't an ideal solution, but it is the simplest.
 
-// getControllerKeys returns a map of existing key locations to their new locations for the "kong" chart.
+// getKongKeys returns a map of existing key locations to their new locations for the "kong" chart.
 func getKongKeys() map[string]string {
 	return map[string]string{
 		"ingressController.image":          "ingressController.deployment.pod.container.image",
@@ -18,7 +18,7 @@ func getKongKeys() map[string]string {
 	}
 }
 
-// getIngressControllerKeys returns a map of existing key locations to their new locations for the "ingress" chart.
+// getIngressKeys returns a map of existing key locations to their new locations for the "ingress" chart.
 func getIngressKeys() map[string]string {
 	return map[string]string{
 		// moved keys, basically getControllerKeys() with a controller. prefix
